@@ -1,3 +1,5 @@
+permissions:
+  contents: read
 on:
   push:
     branches:
@@ -6,7 +8,37 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+      - name: Nemotron check
+        run: |
+          
+          
+          #!/usr/bin/env bash
+          set -euo pipefail
+          
+          missing=0
+          while IFS= read -r -d '' file; do
+              if ! python3 - <<EOF
+          import sys, yaml
+          with open(sys.argv[1], 'r') as f:
+              data = yaml.safe_load(f)
+          if isinstance(data, dict) and 'permissions' in data:
+              sys.exit(0)
+          else:
+              sys.exit(1)
+          EOF "$file"; then
+              echo "Workflow $file missing permissions:"
+              missing=$((missing+1))
+          fi
+          done < <(find .github/workflows -type f \( -name "*.yml" -o -name "*.yaml" \) -print0)
+          
+          if [ "$missing" -eq 0 ]; then
+              exit 0
+          else
+              exit 1
+          fi
